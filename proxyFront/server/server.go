@@ -3,6 +3,7 @@ package proxy
 import (
 	"brother/config"
 	"net"
+	"brother/proxyBack"
 )
 
 type Schema struct {
@@ -27,6 +28,8 @@ type Server struct {
 
 	allowips			[2][]net.IP
 
+	counter				*Counter
+	nodes				map[string]*proxyBack.Node
 	schema				*Schema
 
 	listener			net.Listener
