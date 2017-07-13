@@ -6,7 +6,7 @@ import (
 	"flag"
 
 	."mysql"
-	."brother/proxy/server"
+	."brother/proxyFront/server"
 )
 
 /**
