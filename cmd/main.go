@@ -6,18 +6,18 @@ import (
 	"flag"
 
 	."mysql"
+	."brother/proxy/server"
 )
 
 /**
  * banner
  */
-var banner = `
- ____  _____  ____  ____  ____  _____  _     _____ ____
-/  __\/__ __\/  _ \/  __\/  _ \/__ __\/ \ /|/  __//  __\
-|  \/|  / \  | | //|  \/|| / \|  / \  | |_|||  \  |  \/|
-|  __/  | |  | |_\\|    /| \_/|  | |  | | |||  /_ |    /
-\_/     \_/  \____/\_/\_\\____/  \_/  \_/ \|\____\\_/\_\
-
+var banner = `       _   _               _   _
+ _ __ | |_| |__  _ __ ___ | |_| |__   ___ _ __
+| '_ \| __| '_ \| '__/ _ \| __| '_ \ / _ \ '__|
+| |_) | |_| |_) | | | (_) | |_| | | |  __/ |
+| .__/ \__|_.__/|_|  \___/ \__|_| |_|\___|_|
+|_|
 `
 
 var configFile *string = flag.String("config", "/Users/nanhujiaju/Desktop/GitHubs/kingshard/etc/ks.yaml", "kingshard config file")
@@ -32,4 +32,7 @@ func main() {
 	var m = CLIENT_COMPRESS
 	f.Println(m)
 
+	var svr *Server
+
+	svr.Run()
 }
