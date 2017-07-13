@@ -1,4 +1,4 @@
-package proxy
+package proxyFront
 
 import (
 	"brother/config"

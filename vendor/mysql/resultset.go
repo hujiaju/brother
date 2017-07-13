@@ -3,9 +3,9 @@ package mysql
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/siddontang/mixer/hack"
 	"math"
 	"strconv"
+	"hack"
 )
 
 type RowData []byte

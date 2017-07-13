@@ -6,7 +6,7 @@ import (
 	"flag"
 
 	."mysql"
-	_ "brother/proxyFront/server"
+	"brother/proxyFront/server"
 )
 
 /**
@@ -33,6 +33,7 @@ func main() {
 	f.Println(m)
 
 	//var svr *server.Server
+	Server
 
 	svr.Run()
 }

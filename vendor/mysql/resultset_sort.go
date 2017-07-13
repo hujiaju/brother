@@ -3,8 +3,8 @@ package mysql
 import (
 	"bytes"
 	"fmt"
-	"github.com/siddontang/mixer/hack"
 	"sort"
+	"hack"
 )
 
 const (
