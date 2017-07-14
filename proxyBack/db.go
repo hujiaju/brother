@@ -20,3 +20,8 @@ type DB struct {
 	checkConn			*Conn
 	lastPing			int64
 }
+
+type BackendConn struct {
+	*Conn
+	db *DB
+}

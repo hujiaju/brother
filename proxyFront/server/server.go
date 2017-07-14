@@ -4,6 +4,14 @@ import (
 	"brother/config"
 	"net"
 	"brother/proxyBack"
+	f"fmt"
+	"sync/atomic"
+	"strings"
+	"brother/mysql"
+	"brother/core/errors"
+	"brother/core/golog"
+	"time"
+	"runtime"
 )
 
 type Schema struct {
@@ -26,6 +34,7 @@ type Server struct {
 	statusIndex			int32
 	status				[2]int32
 
+	allowipsIndex			int32
 	allowips			[2][]net.IP
 
 	counter				*Counter
@@ -36,6 +45,228 @@ type Server struct {
 	running				bool
 }
 
-func (s *Server) Run()  {
+func (s *Server) Status() string  {
+	var status string
+	switch s.status[s.statusIndex] {
+	case Online:
+		status = "online"
+	case Offline:
+		status = "offline"
+	case Unknown:
+		status = "unknown"
+	default:
+		status = "unknown"
+	}
+	return status
+}
 
+func (s *Server) parseAllowIps() error {
+	atomic.StoreInt32(&s.allowipsIndex, 0)
+
+	cfg := s.cfg
+	if len(cfg.AllowIps) == 0 {
+		return nil
+	}
+	ipVec := strings.Split(cfg.AllowIps, ",")
+	s.allowips[s.allowipsIndex] = make([]net.IP, 0, 10)
+	s.allowips[1] = make([]net.IP, 0, 10)
+	for _, ip := range ipVec{
+		s.allowips[s.allowipsIndex] = append(s.allowips[s.allowipsIndex], net.ParseIP(strings.TrimSpace(ip)))
+	}
+	return nil
+}
+
+/**
+ * #############################################server parser######################################################
+ **/
+
+func (s *Server) parseBlackListSqls() error {
+	//TODO to be continue
+	return nil
+}
+
+func (s *Server) parseNode() error {
+	return nil
+}
+
+func (s *Server) parseNodes() error {
+	return nil
+}
+
+func (s *Server) parseSchema() error {
+	return nil
+}
+
+/**
+ * #############################################server gettter######################################################
+ **/
+
+func (s *Server) GetSchema() *Schema {
+	return s.schema
+}
+
+/**
+ * #############################################server event######################################################
+ **/
+
+func NewServer(cfg *config.Config) (*Server, error) {
+	s := new(Server)
+
+	s.cfg = cfg
+	s.counter = new(Counter)
+	s.addr = cfg.Addr
+	s.user = cfg.User
+	s.passwd = cfg.Password
+	atomic.StoreInt32(&s.statusIndex, 0)
+	s.status[s.statusIndex] = Online
+	//atomic.StoreInt32(&s.logSqlIndex, 0)
+	//s.logSql[s.logSqlIndex] = cfg.LogSql
+	//atomic.StoreInt32(&s.slowLogTimeIndex, 0)
+	//s.slowLogTime[s.slowLogTimeIndex] = cfg.SlowLogTime
+
+	if len(cfg.Charset) == 0 {
+		cfg.Charset = mysql.DEFAULT_CHARSET //utf8
+	}
+	cid, ok := mysql.CharsetIds[cfg.Charset]
+	if !ok {
+		return nil, errors.ErrInvalidCharset
+	}
+	//change the default charset
+	mysql.DEFAULT_CHARSET = cfg.Charset
+	mysql.DEFAULT_COLLATION_ID = cid
+	mysql.DEFAULT_COLLATION_NAME = mysql.Collations[cid]
+
+	if err := s.parseBlackListSqls(); err != nil {
+		return nil, err
+	}
+
+	if err := s.parseAllowIps(); err != nil {
+		return nil, err
+	}
+
+	if err := s.parseNodes(); err != nil {
+		return nil, err
+	}
+
+	if err := s.parseSchema(); err != nil {
+		return nil, err
+	}
+
+	var err error
+	netProto := "tcp"
+	s.listener, err = net.Listen(netProto, s.addr)
+	if err != nil {
+		return nil, err
+	}
+
+	golog.Info("server", "NewServer", "Server running", 0,
+		"netProto",
+		netProto,
+		"address",
+		s.addr)
+	return s, nil
+}
+
+func (s *Server) flushCounter()  {
+	for {
+		s.counter.FlushCounter()
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func (s *Server) newClientConn(co net.Conn) *ClientConn  {
+	c := new(ClientConn)
+	tcpConn := co.(*net.TCPConn)
+	//SetNoDelay controls whether the operating system should delay packet transmission
+	// in hopes of sending fewer packets (Nagle's algorithm).
+	// The default is true (no delay),
+	// meaning that data is sent as soon as possible after a Write.
+	//I set this option false.
+	tcpConn.SetNoDelay(false)
+	c.c = tcpConn
+
+	c.schema = s.GetSchema()
+
+	c.pkg = mysql.NewPacketIO(tcpConn)
+	c.proxy = s
+
+	c.pkg.Sequence = 0
+
+	c.connectionId = atomic.AddUint32(&baseConnId, 1)
+
+	c.status = mysql.SERVER_STATUS_AUTOCOMMIT
+
+	c.salt = mysql.RandomBuf(20)
+
+	c.txConns = make(map[*proxyBack.Node]*proxyBack.BackendConn)
+
+	c.closed = false
+
+	c.charset = mysql.DEFAULT_CHARSET
+	c.collation = mysql.DEFAULT_COLLATION_ID
+
+	c.stmtId = 0
+	c.stmts = make(map[uint32]*Stmt)
+
+	return c
+}
+
+func (s *Server) Close() {
+	s.running = false
+	if s.listener != nil {
+		s.listener.Close()
+	}
+}
+
+func (s *Server) Run() error {
+	f.Println("server running")
+
+	s.running = true
+
+	//flush counter
+	go s.flushCounter()
+
+	for s.running {
+		conn, err := s.listener.Accept()
+		if err != nil {
+			golog.Error("Server", "Run", err.Error(), 0)
+			continue
+		}
+
+		go s.onConn(conn)
+	}
+	return nil
+}
+
+func (s *Server) onConn(c net.Conn) {
+	s.counter.IncrClientConns()
+	conn := s.newClientConn(c)//新建一个client<->proxy的连接
+
+	defer func() {
+		err := recover()
+		if err != nil {
+			const size  = 4096
+			buf := make([]byte, size)
+			buf = buf[:runtime.Stack(buf, false)] //获得当前goroutine的stacktrace 堆栈信息
+			golog.Error("server", "onConn", "error", 0, "remoteAddr", c.RemoteAddr().String(), "stack", string(buf))
+		}
+
+		conn.Close()
+		s.counter.DecrClientConns()
+	}()
+
+	if allowConnect := conn.IsAllowConnect(); allowConnect == false {
+		err := mysql.NewError(mysql.ER_ACCESS_DENIED_ERROR, "ip address access denied by brother!")
+		conn.writeError(err)
+		conn.Close()
+		return
+	}
+	if err := conn.Handshake(); err != nil {
+		golog.Error("server", "onConn", err.Error(), 0)
+		conn.writeError(err)
+		conn.Close()
+		return
+	}
+
+	conn.Run()
 }
