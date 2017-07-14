@@ -5,7 +5,7 @@ import (
 	"runtime"
 	"flag"
 
-	."brother/mysql"
+	."mysql"
 	"brother/proxyFront/server"
 )
 
