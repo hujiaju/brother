@@ -4,14 +4,13 @@ import (
 	f"fmt"
 	"runtime"
 	"flag"
-
-	"brother/config"
-	."brother/mysql"
-	"brother/proxyFront/server"
-	"brother/core/golog"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"brother/config"
+	"brother/proxyFront/server"
+	"brother/core/golog"
 )
 
 /**
@@ -33,9 +32,6 @@ func main() {
 	f.Println(banner)
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
-
-	var m = CLIENT_COMPRESS
-	f.Println(m)
 
 	if len(*configFile) == 0 {
 		f.Println("must use a config file")

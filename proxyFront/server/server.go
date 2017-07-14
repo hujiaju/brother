@@ -12,11 +12,19 @@ import (
 	"brother/core/golog"
 	"time"
 	"runtime"
+	"os"
+	"bufio"
+	"io"
 )
 
 type Schema struct {
-	//nodes				map[string]*back
+	nodes				map[string]*proxyBack.Node
 	//rule				*router
+}
+
+type BlacklistSqls struct {
+	sqls 				map[string]string
+	sqlsLen				int
 }
 
 const (
@@ -33,6 +41,9 @@ type Server struct {
 
 	statusIndex			int32
 	status				[2]int32
+
+	blacklistSqlsIndex		int32
+	blacklistSqls			[2]*BlacklistSqls
 
 	allowipsIndex			int32
 	allowips			[2][]net.IP
@@ -82,6 +93,43 @@ func (s *Server) parseAllowIps() error {
 
 func (s *Server) parseBlackListSqls() error {
 	//TODO to be continue
+	bs := new(BlacklistSqls)
+	bs.sqls = make(map[string]string)
+	if len(s.cfg.BlsFile) != 0 {
+		file, err := os.Open(s.cfg.BlsFile)
+		if err != nil {
+			return err
+		}
+
+		defer file.Close()
+		rd := bufio.NewReader(file)
+		for {
+			line, err := rd.ReadString('\n')
+			//end of file
+			if err == io.EOF {
+				if len(line) != 0 {
+					fingerPrint := mysql.GetFingerprint(line)
+					md5 := mysql.GetMd5(fingerPrint)
+					bs.sqls[md5] = fingerPrint
+				}
+				break
+			}
+			if err != nil {
+				return err
+			}
+			line = strings.TrimSpace(line)
+			if len(line) != 0 {
+				fingerPrint := mysql.GetFingerprint(line)
+				md5 := mysql.GetMd5(fingerPrint)
+				bs.sqls[md5] = fingerPrint
+			}
+		}
+	}
+	bs.sqlsLen = len(bs.sqls)
+	atomic.StoreInt32(&s.blacklistSqlsIndex, 0)
+	s.blacklistSqls[s.blacklistSqlsIndex] = bs
+	s.blacklistSqls[1] = bs
+	
 	return nil
 }
 
