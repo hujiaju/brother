@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"bytes"
 	"runtime"
+	"brother/core/hack"
 )
 
 //front client <-> mysql proxy
@@ -336,15 +337,26 @@ func (c *ClientConn) Run() {
 	}
 }
 
+/**
+ * ######################################### proxy<-> mysql server dispatch events #####################################
+ */
 func (c *ClientConn) dispatch(data []byte) error {
 	c.proxy.counter.IncrClientQPS()
 	cmd := data[0]
 	data = data[1:]
 
-	golog.Info("server", "dispatch", "received cmd:", 0, cmd)
+	golog.Info("server", "dispatch", "received cmd:", 0, hack.String(data))
 	switch cmd {
 	case mysql.COM_QUIT:
-
+		c.handleRollback()
+		c.Close()
+		return nil
+	case mysql.COM_PING:
+		return c.writeOK(nil)
+	case mysql.COM_INIT_DB:
+		return c.handleUseDB(hack.String(data))
+	case mysql.COM_QUERY:
+		return c.handleQuery(hack.String(data))
 	default:
 		msg := f.Sprintf("command %d not supported now", cmd)
 		golog.Error("ClientConn", "dispatch", msg, 0)

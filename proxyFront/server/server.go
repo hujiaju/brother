@@ -17,6 +17,9 @@ import (
 	"io"
 )
 
+/**
+ * 分库分表规则
+ */
 type Schema struct {
 	nodes				map[string]*proxyBack.Node
 	//rule				*router
@@ -133,15 +136,64 @@ func (s *Server) parseBlackListSqls() error {
 	return nil
 }
 
-func (s *Server) parseNode() error {
-	return nil
+func (s *Server) parseNode(cfg config.NodeConfig) (*proxyBack.Node, error) {
+	var err error
+	n := new(proxyBack.Node)
+	n.Cfg = cfg
+
+	n.DownAfterNoAlive = time.Duration(cfg.DownAfterNoAlive) * time.Second
+	err = n.ParseMaster(cfg.Master)
+	if err != nil {
+		return nil, err
+	}
+	err = n.ParseSlave(cfg.Slave)
+	if err != nil {
+		return nil, err
+	}
+
+	go n.CheckNode()
+
+	return n, nil
 }
 
 func (s *Server) parseNodes() error {
+	cfg := s.cfg
+	s.nodes = make(map[string]*proxyBack.Node, len(cfg.Nodes))
+
+	for _, v := range cfg.Nodes {
+		if _, ok := s.nodes[v.Name]; ok {
+			return f.Errorf("duplicate node [%s].", v.Name)
+		}
+		n, err := s.parseNode(v)
+		if err != nil {
+			return nil
+		}
+		s.nodes[v.Name] = n
+	}
+	
 	return nil
 }
 
 func (s *Server) parseSchema() error {
+	schemaCfg := s.cfg.Schema
+	if len(schemaCfg.Nodes) == 0 {
+		return f.Errorf("schema must have a node.")
+	}
+
+	nodes := make(map[string]*proxyBack.Node)
+	for _, n := range  schemaCfg.Nodes {
+		if s.GetNode(n) == nil {
+			return f.Errorf("schema node [%s] config is not exists.", n)
+		}
+		if _, ok := nodes[n]; ok {
+			return f.Errorf("schema node [%s] duplicated.", n)
+		}
+
+		nodes[n] = s.GetNode(n)
+	}
+
+	//TODO 暂时不实现路由
+
 	return nil
 }
 
@@ -151,6 +203,24 @@ func (s *Server) parseSchema() error {
 
 func (s *Server) GetSchema() *Schema {
 	return s.schema
+}
+
+func (s *Server) GetNode(name string) *proxyBack.Node {
+	return s.nodes[name]
+}
+
+func (s *Server) GetAllNodes() map[string]*proxyBack.Node {
+	return s.nodes
+}
+
+func (s *Server) GetAllowIps() []string {
+	var ips []string
+	for _, v := range  s.allowips[s.allowipsIndex] {
+		if v != nil {
+			ips = append(ips, v.String())
+		}
+	}
+	return ips
 }
 
 /**
@@ -195,10 +265,10 @@ func NewServer(cfg *config.Config) (*Server, error) {
 	if err := s.parseNodes(); err != nil {
 		return nil, err
 	}
-
-	if err := s.parseSchema(); err != nil {
-		return nil, err
-	}
+	//忽略分表规则
+	//if err := s.parseSchema(); err != nil {
+	//	return nil, err
+	//}
 
 	var err error
 	netProto := "tcp"
@@ -318,3 +388,7 @@ func (s *Server) onConn(c net.Conn) {
 
 	conn.Run()
 }
+
+/**
+ * ############################################# web server api events ######################################################
+ **/
