@@ -1,2 +1,0 @@
-# brother
-"pingtou" brother

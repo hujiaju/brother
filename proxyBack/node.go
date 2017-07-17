@@ -42,7 +42,7 @@ func (n *Node) checkMaster() {
 	if err := db.Ping(); err != nil {
 		golog.Error("Node", "checkMaster", "Ping", 0, "db.Addr", db.Addr(), "error", err.Error())
 	} else {
-		if atomic.LoadInt32(&(db.state)) != Down {
+		if atomic.LoadInt32(&(db.state)) == Down {
 			golog.Info("Node", "checkMaster", "Master up", 0, "db.Addr", db.Addr())
 			n.UpMaster(db.addr)
 		}

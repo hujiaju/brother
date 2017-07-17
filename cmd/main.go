@@ -24,7 +24,7 @@ var banner = `       _   _               _   _
 |_|
 `
 
-var configFile *string = flag.String("config", "/Users/nanhujiaju/Desktop/GitHubs/kingshard/etc/ks.yaml", "kingshard config file")
+var configFile *string = flag.String("config", "/Users/nanhujiaju/Desktop/GitHubs/kingshard/etc/ks.yaml", "brother config file")
 var logLevel *string = flag.String("log-level", "", "log level [debug|info|warn|error], default error")
 
 func main() {

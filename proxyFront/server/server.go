@@ -166,7 +166,7 @@ func (s *Server) parseNodes() error {
 		}
 		n, err := s.parseNode(v)
 		if err != nil {
-			return nil
+			return err
 		}
 		s.nodes[v.Name] = n
 	}

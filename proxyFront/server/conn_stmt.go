@@ -1,5 +1,7 @@
 package server
 
+import "brother/sqlparser"
+
 type Stmt struct {
 	id 				uint32
 
@@ -8,6 +10,6 @@ type Stmt struct {
 
 	args				[]interface{}
 
-	//s				sqlparser.Statement
+	s				sqlparser.Statement
 	sql				string
 }

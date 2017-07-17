@@ -133,7 +133,7 @@ func (c *Conn) readInitialHandshake() error {
 		return errors.New("read initial handshake error.")
 	}
 
-	if data[0] == mysql.MinProtocolVersion {
+	if data[0] < mysql.MinProtocolVersion {
 		return f.Errorf("invalid protocol version %d, must >= 10", data[0])
 	}
 
